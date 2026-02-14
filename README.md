@@ -25,6 +25,10 @@ The infrastructure is fully automated and designed to be reproducible and reusab
 
 ## Architecture Design
 
+## Architecture Diagram
+
+![VPC Architecture](diagram2.png)
+
 ### Network Layer (Module: `network`)
 - Custom VPC
 - Public subnet (internet-facing)
