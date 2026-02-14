@@ -130,6 +130,4 @@ terraform destroy
 
 ## Author
 
-Sebastian Silva C.
-Cloud Engineer – Secure Infrastructure & Automation
-Berlin, Germany
+Sebastian Silva C. - Cloud Engineer – Secure Infrastructure & Automation - Berlin, Germany
