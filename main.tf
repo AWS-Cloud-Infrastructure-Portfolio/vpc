@@ -1,8 +1,36 @@
+############################################
+# Provider
+############################################
+
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
 }
 
-# Generate a key pair for the bastion host
+############################################
+# Data Sources
+############################################
+
+data "aws_ssm_parameter" "al2023_latest" {
+  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+}
+
+############################################
+# Locals (Standardized Tags)
+############################################
+
+locals {
+  common_tags = {
+    Project     = "secure-vpc"
+    Environment = "lab"
+    Owner       = "Sebastian"
+    ManagedBy   = "Terraform"
+  }
+}
+
+############################################
+# Key Pair Generation
+############################################
+
 resource "tls_private_key" "bastion" {
   algorithm = "RSA"
   rsa_bits  = 4096
@@ -11,66 +39,73 @@ resource "tls_private_key" "bastion" {
 resource "aws_key_pair" "bastion" {
   key_name   = "lab-bastion-key"
   public_key = tls_private_key.bastion.public_key_openssh
+  tags       = local.common_tags
 }
 
 resource "local_file" "private_key" {
-  content  = tls_private_key.bastion.private_key_pem
-  filename = "${path.module}/lab-bastion-key.pem"
+  content         = tls_private_key.bastion.private_key_pem
+  filename        = "${path.module}/lab-bastion-key.pem"
   file_permission = "0400"
 }
 
+############################################
 # VPC
+############################################
+
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
+  cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = { Name = "lab-vpc" }
+  tags                 = merge(local.common_tags, { Name = "lab-vpc" })
 }
 
-# Public subnet
+############################################
+# Subnets
+############################################
+
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
+  cidr_block              = var.public_subnet_cidr
+  availability_zone       = var.availability_zone
   map_public_ip_on_launch = true
-  availability_zone       = "us-east-1a"
-  tags = { Name = "lab-public" }
+  tags                    = merge(local.common_tags, { Name = "lab-public" })
 }
 
-# Private subnet
 resource "aws_subnet" "private" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "us-east-1a"
-  tags = { Name = "lab-private" }
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnet_cidr
+  availability_zone = var.availability_zone
+  tags              = merge(local.common_tags, { Name = "lab-private" })
 }
 
-# Internet Gateway
+############################################
+# Internet & NAT Gateway
+############################################
+
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
-  tags = { Name = "lab-igw" }
+  tags   = merge(local.common_tags, { Name = "lab-igw" })
 }
 
-# NAT Gateway
 resource "aws_eip" "nat" {
-  vpc = true
+  domain = "vpc"
+  tags   = local.common_tags
 }
 
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public.id
   depends_on    = [aws_internet_gateway.gw]
-  tags = { Name = "lab-natgw" }
+  tags          = merge(local.common_tags, { Name = "lab-natgw" })
 }
 
+############################################
 # Route Tables
+############################################
+
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
-  tags = { Name = "lab-public-rt" }
-}
-
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
+  tags   = merge(local.common_tags, { Name = "lab-public-rt" })
 }
 
 resource "aws_route" "public_internet_access" {
@@ -79,14 +114,14 @@ resource "aws_route" "public_internet_access" {
   gateway_id             = aws_internet_gateway.gw.id
 }
 
-resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.main.id
-  tags = { Name = "lab-private-rt" }
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
 }
 
-resource "aws_route_table_association" "private" {
-  subnet_id      = aws_subnet.private.id
-  route_table_id = aws_route_table.private.id
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+  tags   = merge(local.common_tags, { Name = "lab-private-rt" })
 }
 
 resource "aws_route" "private_nat_access" {
@@ -95,17 +130,25 @@ resource "aws_route" "private_nat_access" {
   nat_gateway_id         = aws_nat_gateway.nat.id
 }
 
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
+}
+
+############################################
 # Security Groups
+############################################
+
 resource "aws_security_group" "bastion" {
   name        = "lab-bastion-sg"
-  description = "Allow SSH from my IP only"
+  description = "Allow SSH from admin IP only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/32"] # <-- Change this to your own IP before running!
+    cidr_blocks = [var.admin_ip]
   }
 
   egress {
@@ -115,7 +158,7 @@ resource "aws_security_group" "bastion" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "lab-bastion-sg" }
+  tags = merge(local.common_tags, { Name = "lab-bastion-sg" })
 }
 
 resource "aws_security_group" "private" {
@@ -124,9 +167,9 @@ resource "aws_security_group" "private" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
     security_groups = [aws_security_group.bastion.id]
   }
 
@@ -137,27 +180,29 @@ resource "aws_security_group" "private" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "lab-private-sg" }
+  tags = merge(local.common_tags, { Name = "lab-private-sg" })
 }
 
-# Bastion Host (public)
+############################################
+# EC2 Instances
+############################################
+
 resource "aws_instance" "bastion" {
-  ami                         = "data.aws_ssm_parameter.al2023_latest.value" # Amazon Linux 2, us-east-1, update if needed
-  instance_type               = "t3.micro"
+  ami                         = data.aws_ssm_parameter.al2023_latest.value
+  instance_type               = var.instance_type
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.bastion.id]
   key_name                    = aws_key_pair.bastion.key_name
   associate_public_ip_address = true
-  tags = { Name = "lab-bastion" }
+  tags                        = merge(local.common_tags, { Name = "lab-bastion" })
 }
 
-# Application EC2 (private)
 resource "aws_instance" "app" {
-  ami                    = "data.aws_ssm_parameter.al2023_latest.value" # Amazon Linux 2, us-east-1
-  instance_type          = "t3.micro"
-  subnet_id              = aws_subnet.private.id
-  vpc_security_group_ids = [aws_security_group.private.id]
-  key_name               = aws_key_pair.bastion.key_name
+  ami                         = data.aws_ssm_parameter.al2023_latest.value
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.private.id
+  vpc_security_group_ids      = [aws_security_group.private.id]
+  key_name                    = aws_key_pair.bastion.key_name
   associate_public_ip_address = false
-  tags = { Name = "lab-app" }
+  tags                        = merge(local.common_tags, { Name = "lab-app" })
 }
