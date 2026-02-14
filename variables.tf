@@ -1,11 +1,11 @@
 variable "region" {
-  description = "AWS region"
   type        = string
+  description = "AWS region"
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for VPC"
   type        = string
+  description = "CIDR block for VPC"
 }
 
 variable "public_subnet_cidr" {
@@ -21,6 +21,11 @@ variable "availability_zone" {
 }
 
 variable "admin_ip" {
-  description = "Admin IP allowed to SSH"
   type        = string
+  description = "Admin IP allowed to SSH (format: x.x.x.x/32)"
+}
+
+variable "instance_type" {
+  type    = string
+  default = "t3.micro"
 }
