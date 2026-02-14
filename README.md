@@ -25,8 +25,6 @@ The infrastructure is fully automated and designed to be reproducible and reusab
 
 ## Architecture Design
 
-## Architecture Diagram
-
 ![VPC Architecture](diagram.png)
 
 ### Network Layer (Module: `network`)
