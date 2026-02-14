@@ -44,6 +44,7 @@ The infrastructure is fully automated and designed to be reproducible and reusab
 
 ## Terraform Structure
 
+```
 root/
 ├── main.tf      # Orchestrates modules
 ├── variables.tf # Input variables
@@ -59,7 +60,7 @@ root/
   ├── main.tf
   ├── variables.tf
   └── outputs.tf
-
+```
   
 The root module orchestrates infrastructure by passing outputs from the network module into the compute module.
 
@@ -97,19 +98,23 @@ private_subnet_cidr  = "10.0.2.0/24"
 availability_zone    = "us-east-1a"
 admin_ip             = "YOUR_PUBLIC_IP/32"
 instance_type        = "t3.micro"
-
+```
 3. Initialize Terraform:
+```
 terraform init
-
-4. Review the execution plan:
+```
+5. Review the execution plan:
+```
 terraform plan
-
-5. Apply the configuration:
+```
+7. Apply the configuration:
+```
 terraform apply
-
-6. Destroy infrastructure when finished:
+```
+8. Destroy infrastructure when finished:
+```
 terraform destroy
-
+```
 ---
 
 ## Key Concepts Demonstrated
