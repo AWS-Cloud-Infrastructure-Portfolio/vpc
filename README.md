@@ -1,56 +1,130 @@
-## AWS VPC Architecture with Public/Private Subnets (Terraform)
+# AWS Secure VPC Architecture (Terraform – Modularized)
 
-Designed and deployed a segmented AWS VPC architecture using Terraform, featuring public and private subnets, NAT Gateway and a bastion host to enforce network isolation and secure access.
+Production-style AWS VPC deployment using Terraform, implementing secure network segmentation, controlled ingress/egress, and modular infrastructure design.
 
 ---
 
 ## Overview
 
-This project demonstrates the design and deployment of a secure AWS VPC using Terraform, focusing on network segmentation, controlled ingress/egress and least-privilege access through public/private subnets, a NAT gateway and a bastion host.
+This project demonstrates the design and deployment of a secure AWS network architecture using a modular Terraform structure.
+
+It includes:
+
+- Public and private subnets
+- Internet Gateway and NAT Gateway
+- Bastion host for controlled administrative access
+- Private EC2 instance with no public exposure
+- Security groups enforcing least-privilege access
+- Parameterized Terraform configuration
+- Centralized tagging strategy
+- Clean provisioning and teardown lifecycle
+
+The infrastructure is fully automated and designed to be reproducible and reusable.
 
 ---
 
-## What I Built
+## Architecture Design
 
-- Custom AWS VPC with public and private subnets.
-- Internet Gateway and NAT Gateway for controlled ingress/egress.
-- Bastion host for secure administrative access.
-- Private EC2 instance with no public IP.
-- Security groups enforcing least-privilege access.
-- Fully automated provisioning and teardown using Terraform.
+### Network Layer (Module: `network`)
+- Custom VPC
+- Public subnet (internet-facing)
+- Private subnet (isolated)
+- Internet Gateway
+- NAT Gateway for outbound-only internet access
+- Dedicated route tables
 
----
-
-## Diagram
-
-![Architecture Diagram](diagram.png)
-
----
-
-## Implementation Highlights
-
-- Provisioned VPC, subnets, route tables, IGW and NAT Gateway using Terraform.
-- Deployed bastion host in public subnet with restricted SSH access.
-- Deployed application EC2 instance in private subnet without public exposure.
-- Verified connectivity via bastion and validated outbound access through NAT.
-- Destroyed all resources using Terraform to avoid ongoing costs.
+### Compute Layer (Module: `compute`)
+- Bastion host in public subnet
+- Private application instance
+- Security group referencing (bastion → private)
+- SSH restricted to a configurable `admin_ip`
+- AMI dynamically retrieved via AWS SSM Parameter Store
 
 ---
 
-## Screenshots
+## Terraform Structure
 
-Selected screenshots are included in the `screenshots/` directory to validate deployment and connectivity.
+root/
+├── main.tf      # Orchestrates modules
+├── variables.tf # Input variables
+├── locals.tf    # Standardized tagging
+├── outputs.tf   # Exposed outputs
+├── versions.tf  # Provider/version constraints
+└── modules/
+├── network/
+│ ├── main.tf
+│ ├── variables.tf
+│ └── outputs.tf
+└── compute/
+  ├── main.tf
+  ├── variables.tf
+  └── outputs.tf
+
+  
+The root module orchestrates infrastructure by passing outputs from the network module into the compute module.
+
+Terraform establishes dependencies automatically through output references, ensuring that the network layer is provisioned before compute resources.
 
 ---
 
-## References
+## Security Considerations
 
-- [AWS VPC Documentation](https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html)
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+- Private EC2 instance has no public IP  
+- SSH access restricted via `admin_ip` variable  
+- Security group referencing instead of CIDR-based internal access  
+- Controlled outbound access through NAT Gateway  
+- Infrastructure deployed with standardized tagging  
+
+Potential production enhancements:
+
+- Multi-AZ high availability  
+- Replacing bastion host with SSM Session Manager  
+- Remote Terraform backend using S3 with DynamoDB state locking  
+- Centralized logging and monitoring integration  
 
 ---
 
-## Contact
+## Deployment Instructions
 
-Maintained by Sebastian Silva C. – Berlin, Germany  
-LinkedIn: https://www.linkedin.com/in/sebastiansilc
+1. Configure AWS credentials.  
+2. Create a `terraform.tfvars` file:
+
+```hcl
+region               = "us-east-1"
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidr   = "10.0.1.0/24"
+private_subnet_cidr  = "10.0.2.0/24"
+availability_zone    = "us-east-1a"
+admin_ip             = "YOUR_PUBLIC_IP/32"
+instance_type        = "t3.micro"
+
+3. Initialize Terraform:
+terraform init
+
+4. Review the execution plan:
+terraform plan
+
+5. Apply the configuration:
+terraform apply
+
+6. Destroy infrastructure when finished:
+terraform destroy
+
+---
+
+## Key Concepts Demonstrated
+
+- Modular Terraform architecture
+- Infrastructure parameterization
+- Implicit dependency management
+- Secure VPC segmentation design
+- Bastion-based administrative access pattern
+- Idempotent infrastructure provisioning
+
+---
+
+## Author
+
+Sebastian Silva C.
+Cloud Engineer – Secure Infrastructure & Automation
+Berlin, Germany
