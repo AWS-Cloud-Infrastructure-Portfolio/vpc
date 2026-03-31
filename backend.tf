@@ -1,9 +1,9 @@
 terraform {
   backend "s3" {
-    bucket         = "your-terraform-state-bucket"
-    key            = "secure-vpc/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "terraform-lock-table"
+    bucket         = "tf-state-secure-vpc-dev"
+    key            = "network/terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "tf-lock-secure-vpc-dev"
     encrypt        = true
   }
 }
