@@ -5,6 +5,8 @@ provider "aws" {
 module "network" {
   source = "./modules/network"
 
+  project             = var.project
+  environment         = var.environment
   vpc_cidr            = var.vpc_cidr
   public_subnet_cidr  = var.public_subnet_cidr
   private_subnet_cidr = var.private_subnet_cidr
@@ -15,6 +17,8 @@ module "network" {
 module "compute" {
   source = "./modules/compute"
 
+  project           = var.project
+  environment       = var.environment
   vpc_id            = module.network.vpc_id
   public_subnet_id  = module.network.public_subnet_id
   private_subnet_id = module.network.private_subnet_id
